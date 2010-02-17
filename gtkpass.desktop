@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Encoding=UTF-8
+Name=Gtkpass
+Comment=KeePass password database manager
+GenericName=Password manager
+Exec=gtkpass %f
+Icon=gtkpass
+StartupNotify=true
+Terminal=false
+# Can't actually handle files so MIME type is excessive at this point
+# MimeType=application/x-keepass;
+Categories=Application;Utility;GTK;

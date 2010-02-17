@@ -1,0 +1,13 @@
+Welcome!
+
+This project sprung out of my desire to read KeePass databases on Qt-less
+platforms (I had a Nokia N770 at the time).  Well, I no longer use it, but I
+kept working at libkpass and decided to make this client to show the library
+actually works.  It may sound petty, but I also much prefer the way GTK
+searches through entries when typing within a list.  I'm also in a position of
+having two databases, one for work and one for home.  This is the only client
+that I know of that lets the user open multiple at one time.  Hopefully it will
+even allow seamless movement of passwords between databases, but I shouldn't
+get ahead of myself.
+
+Enjoy!
