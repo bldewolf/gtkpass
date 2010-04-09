@@ -33,6 +33,7 @@
 #include "config.h"
 
 enum {
+	TL_TYPE,
 	TL_TITLE,
 	TL_TITLE_WEIGHT,
 	TL_USERNAME,
@@ -45,16 +46,16 @@ enum {
 };
 
 enum {
-	SORTID_GROUPS_ON_TOP,
+	TYPE_FILE,
+	TYPE_GROUP,
+	TYPE_ENTRY,
 };
 
 enum {
-	CB_OPEN=1,
-	CB_CLOSE,
-	CB_COPY,
+	SORTID_GROUPS_ON_TOP,
 };
 
-	
+
 
 gboolean walkprint(GtkTreeModel *model,
 			GtkTreePath *path,
@@ -94,6 +95,7 @@ void add_keys_of_group(struct kpass_db *db, GtkTreeStore *ts, GtkTreeIter *paren
 //			strftime(time, 64, "%F", &tms);
 			gtk_tree_store_append(ts, &iter, parent);
 			gtk_tree_store_set(ts, &iter,
+					TL_TYPE, TYPE_ENTRY,
 					TL_TITLE,  db->entries[i]->title,
 					TL_TITLE_WEIGHT, PANGO_WEIGHT_NORMAL,
 					TL_USERNAME, db->entries[i]->username,
@@ -118,6 +120,7 @@ int add_subgroups_to_store(struct kpass_db *db, GtkTreeStore *ts, GtkTreeIter *p
 //			strftime(time, 64, "%c", &tms);
 			gtk_tree_store_append(ts, &iter, parent);
 			gtk_tree_store_set(ts, &iter,
+					TL_TYPE, TYPE_GROUP,
 					TL_TITLE, db->groups[i]->name,
 					TL_TITLE_WEIGHT, PANGO_WEIGHT_BOLD,
 					TL_STRUCT, db->groups[i],
@@ -136,6 +139,7 @@ void add_groups_to_store(struct kpass_db *db, char* name, GtkTreeStore *ts) {
 	GtkTreeIter iter;
 	gtk_tree_store_append(ts, &iter, NULL);
 	gtk_tree_store_set(ts, &iter,
+			TL_TYPE, TYPE_FILE,
 			TL_TITLE, basename(name),
 			TL_TITLE_WEIGHT, PANGO_WEIGHT_NORMAL+1,
 			TL_STRUCT, db,
@@ -454,6 +458,93 @@ static GtkActionEntry entries[] =
 
 static guint n_entries = G_N_ELEMENTS (entries);
 
+void tv_popup_position(GtkMenu *menu, gint *x, gint *y, gboolean *push_in,
+		gpointer data) {
+	GtkWidget *widget = GTK_WIDGET(data);
+	GtkTreeView *tv = GTK_TREE_VIEW(data);
+	GtkTreePath *path;
+	GtkTreeViewColumn *col;
+	GdkRectangle rect;
+	gint ythickness = GTK_WIDGET(menu)->style->ythickness;
+
+	gdk_window_get_origin (widget->window, x, y);
+	gtk_tree_view_get_cursor (tv, &path, &col);
+	gtk_tree_view_get_cell_area (tv, path, col, &rect);
+
+	*x += rect.x+rect.width;
+	*y += rect.y+rect.height+ythickness;
+
+	gtk_tree_path_free(path);
+}
+
+
+/* Handle interaction with the tree view with context menus */
+gboolean tv_popup(GtkWidget *tv, GdkEventButton *ev, gpointer menu_manager) {
+	GtkTreeSelection *selection;
+	GtkTreePath *path;
+	GtkWidget *menu;
+	GtkTreeModel *ts = gtk_tree_view_get_model(GTK_TREE_VIEW(tv));
+	GtkTreeIter iter;
+	guint type;
+
+	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tv));
+
+	/* Bail out if it's not a right click or popup menu button */
+	if(ev && (ev->type != GDK_BUTTON_PRESS || ev->button != 3))
+		return FALSE;
+
+	/* If we right-clicked, move selection */
+	if(ev && ev->type == GDK_BUTTON_PRESS  &&  ev->button == 3) {
+		if (gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(tv),
+					(gint) ev->x, 
+					(gint) ev->y,
+					&path, NULL, NULL, NULL)) {
+			gtk_tree_selection_unselect_all(selection);
+			gtk_tree_selection_select_path(selection, path);
+			gtk_tree_view_set_cursor(GTK_TREE_VIEW(tv), path, NULL, FALSE);
+			gtk_tree_path_free(path);
+		} else return FALSE;
+	}
+
+	/* If we still don't have anything selected, give up */
+	if (gtk_tree_selection_count_selected_rows(selection) < 1)
+		return FALSE;
+
+	/* Grab the TYPE so we can choose a menu */
+	gtk_tree_view_get_cursor(GTK_TREE_VIEW(tv), &path, NULL);
+	if(!path) return FALSE;
+	if(!gtk_tree_model_get_iter(ts, &iter, path)) {
+		gtk_tree_path_free(path);
+		return FALSE;
+	}
+
+	gtk_tree_model_get(ts, &iter,
+			TL_TYPE, &type,
+			-1);
+	gtk_tree_path_free(path);
+	
+	/* Choose menu based on type */
+	if(type == TYPE_ENTRY) {
+		menu = gtk_ui_manager_get_widget(menu_manager, "/EntryPop");
+	} else if(type == TYPE_GROUP) {
+		return FALSE;
+	} else if(type == TYPE_FILE) {
+		return FALSE;
+	} else return FALSE;
+
+	/* Looks like we are good to go */
+	gtk_menu_popup(GTK_MENU(menu), NULL, NULL,
+			ev ? NULL : tv_popup_position, tv,
+			(ev != NULL) ? ev->button : 0,
+			gdk_event_get_time((GdkEvent*)ev));
+	return TRUE;
+}
+
+/* Call regular handler if we receive menu button */
+gboolean tv_popup_menu_button(GtkWidget *tv, gpointer ud) {
+	return tv_popup(tv, NULL, ud);
+}
+
 int main( int argc, char *argv[] ) {
 	GtkTreeStore *ts;
 	GtkWidget *view, *window, *menubar, *window_box, *view_scroller;
@@ -469,17 +560,14 @@ int main( int argc, char *argv[] ) {
 	gtk_init(&argc, &argv);
 
 	/* set up GTK */
-	ts = gtk_tree_store_new (9,
-	G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_POINTER, G_TYPE_BOOLEAN);
-/*	TL_TITLE, TL_TITLE_WEIGHT, TL_USERNAME, TL_PASSWORD, TL_URL, TL_MTIME, TL_MTIME_EPOCH, TL_STRUCT, TL_META_INFO */
+	ts = gtk_tree_store_new (10,
+	G_TYPE_UINT, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_POINTER, G_TYPE_BOOLEAN);
+/*	TL_TYPE, TL_TITLE, TL_TITLE_WEIGHT, TL_USERNAME, TL_PASSWORD, TL_URL, TL_MTIME, TL_MTIME_EPOCH, TL_STRUCT, TL_META_INFO */
 
 	sortable = GTK_TREE_SORTABLE(ts);
 	gtk_tree_sortable_set_sort_func(sortable, SORTID_GROUPS_ON_TOP, sort_iter_compare_func, GINT_TO_POINTER(SORTID_GROUPS_ON_TOP), NULL);
 	gtk_tree_sortable_set_sort_column_id(sortable, SORTID_GROUPS_ON_TOP, GTK_SORT_ASCENDING);
 
-
-
-	gtk_tree_model_foreach(GTK_TREE_MODEL(ts), walkprint, NULL);
 
 	view = gtk_tree_view_new();
 	col = gtk_tree_view_column_new();
@@ -530,6 +618,8 @@ int main( int argc, char *argv[] ) {
 	gtk_tree_selection_set_mode(
 			gtk_tree_view_get_selection(GTK_TREE_VIEW(view)),
 			GTK_SELECTION_SINGLE);
+	
+//	gtk_tree_view_set_reorderable(GTK_TREE_VIEW(view), TRUE);
 
 	view_scroller = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(view_scroller), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -558,6 +648,11 @@ int main( int argc, char *argv[] ) {
 	}
 
 	menubar = gtk_ui_manager_get_widget(menu_manager, "/MainMenu");
+
+	g_signal_connect(view, "button-press-event", (GCallback) tv_popup,
+		menu_manager);
+	g_signal_connect(view, "popup-menu", (GCallback) tv_popup_menu_button,
+		menu_manager);
 
 	gtk_window_add_accel_group (GTK_WINDOW (window), 
 		gtk_ui_manager_get_accel_group (menu_manager));
