@@ -44,6 +44,8 @@ enum {
 	TL_MTIME_EPOCH,
 	TL_STRUCT,
 	TL_META_INFO,
+	TL_PW_HASH,
+	TL_FILENAME,
 };
 
 enum {
@@ -136,23 +138,25 @@ int add_subgroups_to_store(struct kpass_db *db, GtkTreeStore *ts, GtkTreeIter *p
 	return i - index - 1;
 }
 
-void add_groups_to_store(struct kpass_db *db, char* name, GtkTreeStore *ts) {
+void add_groups_to_store(struct kpass_db *db, char* filename, GtkTreeStore *ts, char* pw_hash) {
 	GtkTreeIter iter;
 	char* local_name;
-	char* filename;
+	char* name;
 
-	local_name = strdup(name);
-	filename = strdup(basename(local_name));
+	local_name = strdup(filename);
+	name = strdup(basename(local_name));
 	free(local_name);
 
 	gtk_tree_store_append(ts, &iter, NULL);
 	gtk_tree_store_set(ts, &iter,
 			TL_TYPE, TYPE_FILE,
-			TL_TITLE, filename,
+			TL_TITLE, name,
 			TL_TITLE_WEIGHT, PANGO_WEIGHT_NORMAL+1,
 			TL_STRUCT, db,
+			TL_PW_HASH, pw_hash,
+			TL_FILENAME, filename,
 			-1);
-	free(filename);
+	free(name);
 	add_subgroups_to_store(db, ts, &iter, 0, 0);
 }
 
@@ -161,18 +165,23 @@ void add_groups_to_store(struct kpass_db *db, char* name, GtkTreeStore *ts) {
  * -3: mmap failed
  *  All others are kpass errors
  */
-int load_db_to_ts(char *filename, char *pass, GtkTreeStore *ts) {
+int load_db_to_ts(char *filename, char *pass, char *pw_hash, GtkTreeStore *ts) {
 	uint8_t *file = NULL;
 	int length;
 	int fd;
 	struct stat sb;
-	unsigned char pw_hash[32];
 	kpass_db *db;
 	kpass_retval retval = 0;
 	uint8_t *outdb;
 	int outdb_len;
+	char *hash;
 
 	db = malloc(sizeof(kpass_db));
+
+	if(!pw_hash)
+		pw_hash = malloc(32);
+	else
+		hash = pw_hash;
 
 	memset(db, 0, sizeof(kpass_db));
 
@@ -196,20 +205,28 @@ int load_db_to_ts(char *filename, char *pass, GtkTreeStore *ts) {
 	retval = kpass_init_db(db, file, length);
 	if(retval) goto load_db_to_ts_fail;
 
-	retval = kpass_hash_pw(db, pass, pw_hash);
-	if(retval) goto load_db_to_ts_fail;
+	if(pass) {
+		retval = kpass_hash_pw(db, pass, pw_hash);
+		if(retval) goto load_db_to_ts_fail;
+	}
 	
 	retval = kpass_decrypt_db(db, pw_hash);
 	if(retval) goto load_db_to_ts_fail;
 
-	add_groups_to_store(db, filename, ts);
+	add_groups_to_store(db, filename, ts, pw_hash);
+
+	goto load_db_to_ts_success;
 
 load_db_to_ts_fail:
 	munmap(file, length);
+	free(db);
+	if(!pw_hash)
+		free(hash);
 	close(fd);
 
 //	kpass_free_db(&db);
 //	free(db);
+load_db_to_ts_success:
 	return retval;
 }
 
@@ -238,6 +255,49 @@ void menu_close(GtkWidget *widget, gpointer callback_data) {
 
 	gtk_tree_store_remove(GTK_TREE_STORE(ts), &iter);
 
+	gtk_tree_path_free(path);
+}
+
+void menu_reload(GtkWidget *widget, gpointer callback_data) {
+	GtkTreeView *tv = GTK_TREE_VIEW(callback_data);
+	GtkTreeModel *ts = gtk_tree_view_get_model(tv);
+	GtkTreePath *path;
+	GtkTreeViewColumn *col;
+	GtkTreeIter iter;
+	GtkTreeRowReference *rr;
+	kpass_db *db;
+	char *pw_hash, *filename;
+
+	gtk_tree_view_get_cursor(tv, &path, &col);
+
+
+	if(!path) return;
+
+	while(gtk_tree_path_get_depth(path) > 1) gtk_tree_path_up(path);
+
+	rr = gtk_tree_row_reference_new(ts, path);
+	if(!rr) return;
+	
+	gtk_tree_model_get_iter(ts, &iter, path);
+	gtk_tree_path_free(path);
+
+	gtk_tree_model_get(ts, &iter,
+			TL_STRUCT, &db,
+			TL_PW_HASH, &pw_hash,
+			TL_FILENAME, &filename,
+			-1);
+
+	if(load_db_to_ts(filename, NULL, pw_hash, GTK_TREE_STORE(ts))) {
+		gtk_tree_row_reference_free(rr);
+		return;
+	}
+
+	kpass_free_db(db);
+	free(db);
+
+	path = gtk_tree_row_reference_get_path(rr);
+	gtk_tree_model_get_iter(ts, &iter, path);
+	gtk_tree_store_remove(GTK_TREE_STORE(ts), &iter);
 	gtk_tree_path_free(path);
 }
 
@@ -353,7 +413,7 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 		gtk_widget_hide(dialog_f);
 
 		while (gtk_dialog_run(GTK_DIALOG (dialog_p)) == GTK_RESPONSE_ACCEPT) {
-			retval = load_db_to_ts(filename, (char*)gtk_entry_get_text(GTK_ENTRY(entry_p)), GTK_TREE_STORE(ts));
+			retval = load_db_to_ts(filename, (char*)gtk_entry_get_text(GTK_ENTRY(entry_p)), NULL, GTK_TREE_STORE(ts));
 			if(!retval)
 				break;
 			if(retval > 0)
@@ -414,6 +474,7 @@ static char *ui_xml = " \
 	<menubar name=\"MainMenu\"> \
 		<menu name=\"FileMenu\" action=\"FileMenuAction\"> \
 			<menuitem name=\"Open\" action=\"OpenAction\" /> \
+			<menuitem name=\"Reload\" action=\"ReloadAction\" /> \
 			<menuitem name=\"Close\" action=\"CloseAction\" /> \
 			<separator/> \
 			<menuitem name=\"Quit\" action=\"QuitAction\" /> \
@@ -426,6 +487,13 @@ static char *ui_xml = " \
 			<menuitem name=\"Copy Username\" action=\"CopyUNAction\" /> \
 		</menu> \
 	</menubar> \
+	<popup name=\"FilePop\" action=\"FilePopAction\"> \
+		<menuitem name=\"Open\" action=\"OpenAction\" /> \
+		<menuitem name=\"Reload\" action=\"ReloadAction\" /> \
+		<menuitem name=\"Close\" action=\"CloseAction\" /> \
+	</popup> \
+	<popup name=\"GroupPop\" action=\"GroupPopAction\"> \
+	</popup> \
 	<popup name=\"EntryPop\" action=\"EntryPopAction\"> \
 		<menuitem name=\"Copy Password\" action=\"CopyAction\" /> \
 		<menuitem name=\"Copy Password\" action=\"CopyPWAction\" /> \
@@ -443,6 +511,11 @@ static GtkActionEntry entries[] =
     "_Open","<control>O",  
     "Open a new file",
     G_CALLBACK (menu_open) },
+
+  { "ReloadAction", GTK_STOCK_REFRESH,
+    "_Reload","<control>R",  
+    "Reload the selected file",
+    G_CALLBACK (menu_reload) },
     
   { "CloseAction", GTK_STOCK_CLOSE,
     "_Close","",  
@@ -536,9 +609,10 @@ gboolean tv_popup(GtkWidget *tv, GdkEventButton *ev, gpointer menu_manager) {
 	if(type == TYPE_ENTRY) {
 		menu = gtk_ui_manager_get_widget(menu_manager, "/EntryPop");
 	} else if(type == TYPE_GROUP) {
-		return FALSE;
+//		menu = gtk_ui_manager_get_widget(menu_manager, "/GroupPop");
+		return FALSE: // bail out until we have a real menu here
 	} else if(type == TYPE_FILE) {
-		return FALSE;
+		menu = gtk_ui_manager_get_widget(menu_manager, "/FilePop");
 	} else return FALSE;
 
 	/* Looks like we are good to go */
@@ -569,9 +643,9 @@ int main( int argc, char *argv[] ) {
 	gtk_init(&argc, &argv);
 
 	/* set up GTK */
-	ts = gtk_tree_store_new (10,
-	G_TYPE_UINT, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_POINTER, G_TYPE_BOOLEAN);
-/*	TL_TYPE, TL_TITLE, TL_TITLE_WEIGHT, TL_USERNAME, TL_PASSWORD, TL_URL, TL_MTIME, TL_MTIME_EPOCH, TL_STRUCT, TL_META_INFO */
+	ts = gtk_tree_store_new (12,
+	G_TYPE_UINT, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_UINT, G_TYPE_POINTER, G_TYPE_BOOLEAN, G_TYPE_POINTER, G_TYPE_STRING);
+/*	TL_TYPE, TL_TITLE, TL_TITLE_WEIGHT, TL_USERNAME, TL_PASSWORD, TL_URL, TL_MTIME, TL_MTIME_EPOCH, TL_STRUCT, TL_META_INFO, TL_PW_HASH, TL_FILENAME */
 
 	sortable = GTK_TREE_SORTABLE(ts);
 	gtk_tree_sortable_set_sort_func(sortable, SORTID_GROUPS_ON_TOP, sort_iter_compare_func, GINT_TO_POINTER(SORTID_GROUPS_ON_TOP), NULL);
