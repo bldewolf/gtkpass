@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <libgen.h>
 
 #include <kpass.h>
 
@@ -137,13 +138,21 @@ int add_subgroups_to_store(struct kpass_db *db, GtkTreeStore *ts, GtkTreeIter *p
 
 void add_groups_to_store(struct kpass_db *db, char* name, GtkTreeStore *ts) {
 	GtkTreeIter iter;
+	char* local_name;
+	char* filename;
+
+	local_name = strdup(name);
+	filename = strdup(basename(local_name));
+	free(local_name);
+
 	gtk_tree_store_append(ts, &iter, NULL);
 	gtk_tree_store_set(ts, &iter,
 			TL_TYPE, TYPE_FILE,
-			TL_TITLE, basename(name),
+			TL_TITLE, filename,
 			TL_TITLE_WEIGHT, PANGO_WEIGHT_NORMAL+1,
 			TL_STRUCT, db,
 			-1);
+	free(filename);
 	add_subgroups_to_store(db, ts, &iter, 0, 0);
 }
 
