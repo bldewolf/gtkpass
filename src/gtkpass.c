@@ -610,7 +610,7 @@ gboolean tv_popup(GtkWidget *tv, GdkEventButton *ev, gpointer menu_manager) {
 		menu = gtk_ui_manager_get_widget(menu_manager, "/EntryPop");
 	} else if(type == TYPE_GROUP) {
 //		menu = gtk_ui_manager_get_widget(menu_manager, "/GroupPop");
-		return FALSE: // bail out until we have a real menu here
+		return FALSE; // bail out until we have a real menu here
 	} else if(type == TYPE_FILE) {
 		menu = gtk_ui_manager_get_widget(menu_manager, "/FilePop");
 	} else return FALSE;
