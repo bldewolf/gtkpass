@@ -346,8 +346,10 @@ void menu_copy_un(GtkWidget *widget, gpointer callback_data) {
 			-1);
 
 	if(val && strlen(val) > 0) {
-		gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), val, -1);
-		gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), val, -1);
+		gtk_clipboard_set_text(gtk_clipboard_get(
+					GDK_SELECTION_CLIPBOARD), val, -1);
+		gtk_clipboard_set_text(gtk_clipboard_get(
+					GDK_SELECTION_PRIMARY), val, -1);
 	}
 
 	gtk_tree_path_free(path);
@@ -374,6 +376,7 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 	GtkWidget *dialog_f, *dialog_p, *mdialog_p, *label_p, *entry_p;
 	GtkFileFilter *filter;
 	GtkTreeIter iter;
+	GtkWidget *hbox;
 	char *filename;
 	int retval;
 
@@ -396,30 +399,50 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER (dialog_f), filter);
 
 	/* Set up password entry */
-	dialog_p = gtk_dialog_new_with_buttons("Password", NULL, 0, GTK_STOCK_OK, GTK_RESPONSE_ACCEPT, GTK_STOCK_CANCEL, GTK_RESPONSE_REJECT, NULL);
-	gtk_dialog_set_default_response(GTK_DIALOG(dialog_p), GTK_RESPONSE_ACCEPT);
+	dialog_p = gtk_dialog_new_with_buttons("Password", NULL, 0,
+			GTK_STOCK_OK, GTK_RESPONSE_ACCEPT, GTK_STOCK_CANCEL,
+			GTK_RESPONSE_REJECT, NULL);
+	gtk_dialog_set_default_response(GTK_DIALOG(dialog_p),
+					GTK_RESPONSE_ACCEPT);
 
 
-	label_p = gtk_label_new("Enter the password for this database:");
+	label_p = gtk_label_new("Password:");
 	entry_p = gtk_entry_new();
 	gtk_entry_set_visibility(GTK_ENTRY(entry_p), FALSE);
 	gtk_entry_set_activates_default(GTK_ENTRY(entry_p), TRUE);
-//	gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area (GTK_DIALOG (dialog_p))),label_p);
-	gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area (GTK_DIALOG (dialog_p))),entry_p);
+
+	hbox = gtk_hbox_new(FALSE, 0);
+	gtk_container_add(GTK_CONTAINER(hbox), label_p);
+	gtk_container_add(GTK_CONTAINER(hbox), entry_p);
+
+	gtk_container_add(GTK_CONTAINER(gtk_dialog_get_content_area(
+					GTK_DIALOG (dialog_p))),
+					hbox);
+	gtk_widget_show (label_p);
 	gtk_widget_show (entry_p);
+	gtk_widget_show (hbox);
 
 	if (gtk_dialog_run (GTK_DIALOG (dialog_f)) == GTK_RESPONSE_ACCEPT){
 		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog_f));
 		gtk_widget_hide(dialog_f);
 
 		while (gtk_dialog_run(GTK_DIALOG (dialog_p)) == GTK_RESPONSE_ACCEPT) {
-			retval = load_db_to_ts(filename, (char*)gtk_entry_get_text(GTK_ENTRY(entry_p)), NULL, GTK_TREE_STORE(ts));
+			retval = load_db_to_ts(filename,
+				(char*)gtk_entry_get_text(GTK_ENTRY(entry_p)),
+				NULL, GTK_TREE_STORE(ts));
 			if(!retval)
 				break;
 			if(retval > 0)
-				mdialog_p = gtk_message_dialog_new(GTK_WINDOW(dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Error loading database: %s", kpass_error_str[retval]);
+				mdialog_p = gtk_message_dialog_new(GTK_WINDOW(
+				dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+				"Error loading database: %s",
+				kpass_error_str[retval]);
 			else
-				mdialog_p = gtk_message_dialog_new(GTK_WINDOW(dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Error opening file: %s", g_strerror(errno));
+				mdialog_p = gtk_message_dialog_new(GTK_WINDOW(
+				dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
+				"Error opening file: %s", g_strerror(errno));
 
 			gtk_dialog_run (GTK_DIALOG (mdialog_p));
 			gtk_widget_destroy (mdialog_p);
