@@ -379,10 +379,11 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 	GtkWidget *hbox;
 	char *filename;
 	int retval;
+	GtkWidget *parent_window = gtk_widget_get_toplevel(callback_data);
 
 	/* Set up file chooser */
 	dialog_f = gtk_file_chooser_dialog_new ("Open File",
-			NULL,
+			GTK_WINDOW(parent_window),
 			GTK_FILE_CHOOSER_ACTION_OPEN,
 			GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 			GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
@@ -399,7 +400,8 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 	gtk_file_chooser_add_filter(GTK_FILE_CHOOSER (dialog_f), filter);
 
 	/* Set up password entry */
-	dialog_p = gtk_dialog_new_with_buttons("Password", NULL, 0,
+	dialog_p = gtk_dialog_new_with_buttons("Password",
+			GTK_WINDOW(parent_window), 0,
 			GTK_STOCK_OK, GTK_RESPONSE_ACCEPT, GTK_STOCK_CANCEL,
 			GTK_RESPONSE_REJECT, NULL);
 	gtk_dialog_set_default_response(GTK_DIALOG(dialog_p),
@@ -423,7 +425,8 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 	gtk_widget_show (hbox);
 
 	if (gtk_dialog_run (GTK_DIALOG (dialog_f)) == GTK_RESPONSE_ACCEPT){
-		filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (dialog_f));
+		filename = gtk_file_chooser_get_filename(
+					GTK_FILE_CHOOSER (dialog_f));
 		gtk_widget_hide(dialog_f);
 
 		while (gtk_dialog_run(GTK_DIALOG (dialog_p)) == GTK_RESPONSE_ACCEPT) {
@@ -490,45 +493,88 @@ gint sort_iter_compare_func (GtkTreeModel *model,
 	return ret;
 }
 
+void menu_about(GtkWidget *widget, gpointer callback_data) {
+	const gchar *authors[] = {
+		"Brian De Wolf",
+		NULL
+	};
 
+	const gchar *license =
+"gtkpass, a GTK password manager using libkpass\n"
+"Copyright (C) 2010 Brian De Wolf\n"
+"\n"
+"This program is free software: you can redistribute it and/or modify\n"
+"it under the terms of the GNU General Public License as published\n"
+"by the Free Software Foundation, either version 3 of the License,\n"
+"or (at your option) any later version.\n"
+"\n"
+"This program is distributed in the hope that it will be useful,\n"
+"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"
+"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See\n"
+"the GNU General Public License for more details.\n"
+"\n"
+"You should have received a copy of the GNU General Public License\n"
+"along with this program.  If not, see <http://www.gnu.org/licenses/>.\n";
 
-static char *ui_xml = " \
-<ui> \
-	<menubar name=\"MainMenu\"> \
-		<menu name=\"FileMenu\" action=\"FileMenuAction\"> \
-			<menuitem name=\"Open\" action=\"OpenAction\" /> \
-			<menuitem name=\"Reload\" action=\"ReloadAction\" /> \
-			<menuitem name=\"Close\" action=\"CloseAction\" /> \
-			<separator/> \
-			<menuitem name=\"Quit\" action=\"QuitAction\" /> \
-		</menu> \
-		<menu name=\"GroupMenu\" action=\"GroupMenuAction\"> \
-		</menu> \
-		<menu name=\"EntryMenu\" action=\"EntryMenuAction\"> \
-			<menuitem name=\"Copy Password\" action=\"CopyAction\" /> \
-			<menuitem name=\"Copy Password\" action=\"CopyPWAction\" /> \
-			<menuitem name=\"Copy Username\" action=\"CopyUNAction\" /> \
-		</menu> \
-	</menubar> \
-	<popup name=\"FilePop\" action=\"FilePopAction\"> \
-		<menuitem name=\"Open\" action=\"OpenAction\" /> \
-		<menuitem name=\"Reload\" action=\"ReloadAction\" /> \
-		<menuitem name=\"Close\" action=\"CloseAction\" /> \
-	</popup> \
-	<popup name=\"GroupPop\" action=\"GroupPopAction\"> \
-	</popup> \
-	<popup name=\"EntryPop\" action=\"EntryPopAction\"> \
-		<menuitem name=\"Copy Password\" action=\"CopyAction\" /> \
-		<menuitem name=\"Copy Password\" action=\"CopyPWAction\" /> \
-		<menuitem name=\"Copy Username\" action=\"CopyUNAction\" /> \
-	</popup> \
-</ui>";
+	GtkWidget *parent_window = gtk_widget_get_toplevel(callback_data);
+
+	gtk_show_about_dialog ( GTK_WINDOW(parent_window),
+			"program-name", PACKAGE_NAME,
+			"version", PACKAGE_VERSION,
+			"copyright", "© 2010 Brian De Wolf",
+			"license", license,
+			"website", PACKAGE_URL,
+			"comments", "A GTK password manager using libkpass",
+			"authors", authors,
+			"logo", gtk_window_get_icon(GTK_WINDOW(parent_window)),
+			"title", "About gtkpass",
+			NULL);
+}
+
+static char *ui_xml =
+"<ui>\n"
+"	<menubar name='MainMenu'>\n"
+"		<menu name='FileMenu' action='FileMenuAction'>\n"
+"			<menuitem name='Open' action='OpenAction' />\n"
+"			<menuitem name='Reload' action='ReloadAction' />\n"
+"			<menuitem name='Close' action='CloseAction' />\n"
+"			<separator/>\n"
+"			<menuitem name='Quit' action='QuitAction' />\n"
+"		</menu>\n"
+"		<menu name='GroupMenu' action='GroupMenuAction'>\n"
+"		</menu>\n"
+"		<menu name='EntryMenu' action='EntryMenuAction'>\n"
+"			<menuitem name='Copy Password'\n"
+"					action='CopyAction' />\n"
+"			<menuitem name='Copy Password'\n"
+"					action='CopyPWAction' />\n"
+"			<menuitem name='Copy Username'\n"
+"					action='CopyUNAction' />\n"
+"		</menu>\n"
+"		<menu name='HelpMenu' action='HelpMenuAction'>\n"
+"			<menuitem name='About' action='AboutAction' />\n"
+"		</menu>\n"
+"	</menubar>\n"
+"	<popup name='FilePop' action='FilePopAction'>\n"
+"		<menuitem name='Open' action='OpenAction' />\n"
+"		<menuitem name='Reload' action='ReloadAction' />\n"
+"		<menuitem name='Close' action='CloseAction' />\n"
+"	</popup>\n"
+"	<popup name='GroupPop' action='GroupPopAction'>\n"
+"	</popup>\n"
+"	<popup name='EntryPop' action='EntryPopAction'>\n"
+"		<menuitem name='Copy Password' action='CopyAction' />\n"
+"		<menuitem name='Copy Password' action='CopyPWAction' />\n"
+"		<menuitem name='Copy Username' action='CopyUNAction' />\n"
+"	</popup>\n"
+"</ui>\n";
 
 static GtkActionEntry entries[] = 
 {
   { "FileMenuAction", NULL, "_File" },
   { "GroupMenuAction", NULL, "_Group" },
   { "EntryMenuAction", NULL, "_Entry" },
+  { "HelpMenuAction", NULL, "_Help" },
     
   { "OpenAction", GTK_STOCK_OPEN,
     "_Open","<control>O",  
@@ -559,6 +605,11 @@ static GtkActionEntry entries[] =
     "_Copy Username", "<control>B",    
     "Copy username of entry to clipboard",
     G_CALLBACK (menu_copy_un) },
+
+  { "AboutAction", GTK_STOCK_ABOUT,
+    "About", "",
+    "About this program",
+    G_CALLBACK (menu_about) },
 };
 
 static guint n_entries = G_N_ELEMENTS (entries);
