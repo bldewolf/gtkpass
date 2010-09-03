@@ -734,6 +734,7 @@ int main( int argc, char *argv[] ) {
 	gtk_tree_view_column_pack_start(col, renderer, TRUE);
 	gtk_tree_view_column_add_attribute(col, renderer, "text", TL_TITLE);
 	gtk_tree_view_column_add_attribute(col, renderer, "weight", TL_TITLE_WEIGHT);
+	gtk_tree_view_set_search_column(GTK_TREE_VIEW(view), TL_TITLE);
 /*	Save this tidbit for when we want RW databases
 	g_object_set(renderer, "editable", TRUE, NULL);
 */
