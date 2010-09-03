@@ -1,5 +1,5 @@
 AC_PREREQ([2.65])
-AC_INIT([gtkpass], [2], [gtkpass@bldewolf.com], [gtkpass], [http://sourceforge.net/projects/gtkpass])
+AC_INIT([gtkpass], [3], [gtkpass@bldewolf.com], [gtkpass], [http://sourceforge.net/projects/gtkpass])
 AC_CONFIG_SRCDIR([src/gtkpass.c])
 AC_CONFIG_HEADERS([config.h])
 
