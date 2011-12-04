@@ -587,7 +587,7 @@ static GtkActionEntry entries[] =
     G_CALLBACK (menu_reload) },
     
   { "CloseAction", GTK_STOCK_CLOSE,
-    "_Close","",  
+    "_Close","<control>W",  
     "Close the selected file",
     G_CALLBACK (menu_close) },
 
