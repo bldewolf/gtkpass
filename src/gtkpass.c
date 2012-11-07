@@ -205,10 +205,8 @@ int load_db_to_ts(char *filename, char *pass, char *pw_hash, GtkTreeStore *ts) {
 	retval = kpass_init_db(db, file, length);
 	if(retval) goto load_db_to_ts_fail;
 
-	if(pass) {
-		retval = kpass_hash_pw(db, pass, pw_hash);
-		if(retval) goto load_db_to_ts_fail;
-	}
+	if(pass)
+		kpass_hash_pw(pass, pw_hash);
 	
 	retval = kpass_decrypt_db(db, pw_hash);
 	if(retval) goto load_db_to_ts_fail;
@@ -440,7 +438,7 @@ void menu_open(GtkWidget *widget, gpointer callback_data) {
 				dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT,
 				GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE,
 				"Error loading database: %s",
-				kpass_error_str[retval]);
+				kpass_strerror(retval));
 			else
 				mdialog_p = gtk_message_dialog_new(GTK_WINDOW(
 				dialog_p), GTK_DIALOG_DESTROY_WITH_PARENT,
